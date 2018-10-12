@@ -3,7 +3,11 @@ FROM ubuntu:12.04
 # Install dependencies
 RUN apt-get update -y
 RUN apt-get install -y apache2
-
+RUN apt-get install -y curl
+RUN curl -fsSLO https://get.docker.com/builds/Linux/x86_64/docker-17.04.0-ce.tgz \
+  && tar xzvf docker-17.04.0-ce.tgz \
+  && mv docker/docker /usr/local/bin \
+  && rm -r docker docker-17.04.0-ce.tgz
 # Install apache2 and write “welcome to my container” message
 RUN echo " Welcome to my container... Jenkins updated your application with new version" > /var/www/index.html
 
