@@ -9,10 +9,10 @@ node {
   checkout scm
 
   stage 'Build image'
-  sh("docker build -t ${imageTag} .")
+  sh("gcloud docker build -t ${imageTag} .")
 
   stage 'Run tests'
-  sh("docker images")
+  sh("gcloud docker images")
 
   stage 'Push image to registry'
   sh("gcloud docker -- push ${imageTag}")
