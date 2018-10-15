@@ -9,16 +9,16 @@ node {
   checkout scm
 
   stage 'Build image'
-  sh("gcloud docker build -t ${imageTag} .")
+  sh("docker build -t ${imageTag} .")
 
   stage 'Run tests'
-  sh("gcloud docker images")
+  sh("docker images")
 
   stage 'Push image to registry'
   sh("gcloud docker -- push ${imageTag}")
 
   stage ('Deploy Application') {
-  def check = sh script: "kubectl get deployment --namespace jenkins|grep myapache-app|awk '{print \$1}'", returnStdout: true
+  def check = sh script: "kubectl get deployment --namespace default|grep myapache-app|awk '{print \$1}'", returnStdout: true
  // String xyz = echo "${check}"
   // String abc = echo "my${appName}"
 	//  #!/bin/bash
