@@ -13,6 +13,7 @@ COPY config/*.groovy /usr/share/jenkins/ref/init.groovy.d/
 
 # Once jenkins is running and configured, run the following command to find the list of plugins installed:
 ##  curl -s -k "http://admin:admin@localhost:8080/pluginManager/api/json?depth=1" | jq -r '.plugins[].shortName' | tee plugins.txt
+USER root
 RUN curl -fsSLO https://get.docker/builds/Linux/x86_64/docker-17.04.0-ce.tgz \
   && tar xzvf docker-17.04.0-ce.tgz \
   && mv docker/docker /usr/local/bin \
