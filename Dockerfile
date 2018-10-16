@@ -13,6 +13,10 @@ COPY config/*.groovy /usr/share/jenkins/ref/init.groovy.d/
 
 # Once jenkins is running and configured, run the following command to find the list of plugins installed:
 ##  curl -s -k "http://admin:admin@localhost:8080/pluginManager/api/json?depth=1" | jq -r '.plugins[].shortName' | tee plugins.txt
+RUN curl -fsSLO https://get.docker/builds/Linux/x86_64/docker-17.04.0-ce.tgz \
+  && tar xzvf docker-17.04.0-ce.tgz \
+  && mv docker/docker /usr/local/bin \
+  && rm -r docker docker-17.04.0-ce.tgz
 RUN /usr/local/bin/install-plugins.sh \
   ace-editor \
   ant \
@@ -113,20 +117,6 @@ RUN /usr/local/bin/install-plugins.sh \
   workflow-step-api \
   workflow-support \
   ws-cleanup
-
-USER root
-
-# Install Docker from official repo
-RUN apt-get update -qq && \
-    apt-get install -qqy apt-transport-https ca-certificates curl gnupg2 software-properties-common && \
-    curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add - && \
-    apt-key fingerprint 0EBFCD88 && \
-    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable" && \
-    apt-get update -qq && \
-    apt-get install -qqy docker-ce && \
-    usermod -aG docker jenkins && \
-    chown -R jenkins:jenkins $JENKINS_HOME/
-
 USER jenkins
 
 VOLUME [$JENKINS_HOME, "/var/run/docker.sock"]
