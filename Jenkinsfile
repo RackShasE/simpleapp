@@ -1,37 +1,66 @@
-node {
-  def project = 'myjenkinspro'
-  def appName = 'apache-app'
-  def feSvcName = "my${appName}"
-  def imageTag = "gcr.io/${project}/${appName}:${env.BRANCH_NAME}.${env.BUILD_NUMBER}"
-  // def check = sh script: "kubectl get deployment --namespace jenkins|grep ${feSvcName}|awk '{print \$1}'", returnStdout: true
+def label = "worker-${UUID.randomUUID().toString()}"
+
+podTemplate(label: label, containers: [
+  containerTemplate(name: 'gradle', image: 'gradle:4.5.1-jdk9', command: 'cat', ttyEnabled: true),
+  containerTemplate(name: 'docker', image: 'docker', command: 'cat', ttyEnabled: true),
+  containerTemplate(name: 'kubectl', image: 'lachlanevenson/k8s-kubectl:v1.8.8', command: 'cat', ttyEnabled: true),
+  containerTemplate(name: 'helm', image: 'lachlanevenson/k8s-helm:latest', command: 'cat', ttyEnabled: true)
+],
+volumes: [
+  hostPathVolume(mountPath: '/home/gradle/.gradle', hostPath: '/tmp/jenkins/.gradle'),
+  hostPathVolume(mountPath: '/var/run/docker.sock', hostPath: '/var/run/docker.sock')
+]) {
+  node(label) {
+    def myRepo = checkout scm
+    def gitCommit = myRepo.GIT_COMMIT
+    def gitBranch = myRepo.GIT_BRANCH
+    def shortGitCommit = "${gitCommit[0..10]}"
+    def previousGitCommit = sh(script: "git rev-parse ${gitCommit}~", returnStdout: true)
  
-
-  checkout scm
-
-  stage 'Build image'
-  sh("docker build -t ${imageTag} .")
-
-  stage 'Run tests'
-  sh("docker images")
-
-  stage 'Push image to registry'
-  sh("gcloud docker -- push ${imageTag}")
-
-  stage ('Deploy Application') {
-  def check = sh script: "kubectl get deployment --namespace default|grep myapache-app|awk '{print \$1}'", returnStdout: true
- // String xyz = echo "${check}"
-  // String abc = echo "my${appName}"
-	//  #!/bin/bash
-   // sh script: {
-	//  if ( xyz.toUpperCase() == abc.toUppercase() ) {
-	  if (check) {
-        sh("kubectl set image deployment/${feSvcName} ${feSvcName}=${imageTag}")
-	echo 'Successfully updated the deployment'
-           } else {
-    sh("kubectl run  ${feSvcName} --image=${imageTag} --port 80") 
-    sh("kubectl expose deployment ${feSvcName} --type=LoadBalancer --port=8080 --target-port=80")
-    echo 'To access your environment run `kubectl get svc`'
+    stage('Test') {
+      try {
+        container('gradle') {
+          sh """
+            pwd
+            echo "GIT_BRANCH=${gitBranch}" >> /etc/environment
+            echo "GIT_COMMIT=${gitCommit}" >> /etc/environment
+            gradle test
+            """
+        }
       }
-// }
+      catch (exc) {
+        println "Failed to test - ${currentBuild.fullDisplayName}"
+        throw(exc)
+      }
+    }
+    stage('Build') {
+      container('gradle') {
+        sh "gradle build"
+      }
+    }
+    stage('Create Docker images') {
+      container('docker') {
+        withCredentials([[$class: 'UsernamePasswordMultiBinding',
+          credentialsId: 'dockerhub',
+          usernameVariable: 'DOCKER_HUB_USER',
+          passwordVariable: 'DOCKER_HUB_PASSWORD']]) {
+          sh """
+            docker login -u ${DOCKER_HUB_USER} -p ${DOCKER_HUB_PASSWORD}
+            docker build -t namespace/my-image:${gitCommit} .
+            docker push namespace/my-image:${gitCommit}
+            """
+        }
+      }
+    }
+    stage('Run kubectl') {
+      container('kubectl') {
+        sh "kubectl get pods"
+      }
+    }
+    stage('Run helm') {
+      container('helm') {
+        sh "helm list"
+      }
+    }
   }
 }
